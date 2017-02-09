@@ -1,0 +1,177 @@
+buildscript {
+    repositories {
+        jcenter()
+        mavenCentral()
+    }
+    dependencies {
+        classpath "org.springframework.boot:spring-boot-gradle-plugin:1.2.5.RELEASE"
+        classpath "org.springframework:springloaded:1.2.3.RELEASE"
+        classpath 'net.saliman:gradle-properties-plugin:1.4.2'
+        classpath 'org.hidetake:gradle-ssh-plugin:1.1.3'
+    }
+}
+
+//*************************************************************************
+// Sub Project
+//*************************************************************************
+
+if (!project.has('env')) project.set('env', 'local')
+project.set('environmentName', "$env")
+
+apply plugin: 'org.hidetake.ssh'
+
+subprojects {
+    apply plugin: 'java'
+    apply plugin: 'spring-boot'
+    apply plugin: 'org.hidetake.ssh'
+    apply plugin: 'net.saliman.properties'
+
+    sourceCompatibility = 1.8
+    targetCompatibility = 1.8
+
+    repositories {
+        jcenter()
+        mavenCentral()
+    }
+
+    tasks.withType(AbstractCompile) {
+        options.encoding = 'UTF-8'
+    }
+    tasks.withType(Javadoc) {
+        options.encoding = 'UTF-8'
+    }
+    version = mainVersion
+
+    jar {
+        manifest.attributes provider: 'gradle'
+    }
+
+    test {
+        testLogging.showStandardStreams = true
+    }
+
+    bootRun {
+       jvmArgs = ["-Dfile.encoding=UTF-8"]
+    }
+
+//*************************************************************************
+// Configuration
+//*************************************************************************
+
+    task loadEnvResources() {
+        def envResDir = file("src/main/environment/$env")
+        if (!envResDir.exists()) println "Environment: $env is not existed in "+project.name
+        else {
+            println "Target environment: $env for "+project.name
+            copy {
+                from "$envResDir"
+                into "src/main/resources"
+                include '**/*'
+            }
+        }
+    }
+
+    processResources.duplicatesStrategy = DuplicatesStrategy.WARN
+    processResources.dependsOn loadEnvResources
+
+//*************************************************************************
+// SSH
+//*************************************************************************
+
+// Remote host definition
+    ssh.settings {
+        knownHosts = allowAnyHosts
+    }
+
+    remotes {
+        api_svr {
+            role('api_svr')
+            host = application_server_host
+            user = application_server_user
+            password = application_server_password
+        }
+        console_svr {
+            role('console_svr')
+            host = application_server_host
+            user = application_server_user
+            password = application_server_password
+        }
+        erp_svr {
+            role('erp_svr')
+            host = application_server_host
+            user = application_server_user
+            password = application_server_password
+        }
+    }
+
+//*************************************************************************
+// Deployment
+//*************************************************************************
+
+    task deployToServer(dependsOn:jar) << {
+        ssh.run {
+            session(remotes.role(deploy_target_svr_role)) {
+                execute("mkdir -p tmp", ignoreError: true)
+                put(jar.archivePath.absolutePath, "tmp/$jar.archiveName")
+                execute("mv tmp/$jar.archiveName $deploy_home$deploy_name/lib/")
+                put(project(':module_shared').jar.archivePath.absolutePath,
+                        "tmp/"+project(':module_shared').jar.archiveName)
+                execute("mv tmp/"+project(':module_shared').jar.archiveName+" $deploy_home$deploy_name/lib/")
+                execute("$deploy_home$deploy_name/$executable restart", ignoreError: true)
+            }
+        }
+    }
+
+    task deployAllToServer(dependsOn:distZip) << {
+        ext.unzipName = distZip.archiveName.substring(0, distZip.archiveName.length()-4)
+        ssh.run {
+            session(remotes.role(deploy_target_svr_role)) {
+                execute("$deploy_home$deploy_name/$executable stop", ignoreError: true)
+                put(distZip.archivePath.absolutePath, distZip.archiveName)
+                execute("rm -rf $deploy_home$distZip.archiveName", ignoreError: true)
+                execute("unzip -o $distZip.archiveName -d $deploy_home")
+                execute("rm -f $deploy_home$deploy_name")
+                execute("ln -sf $deploy_home$unzipName $deploy_home$deploy_name")
+                execute("$deploy_home$deploy_name/$executable start", ignoreError: true)
+            }
+        }
+    }
+
+//*************************************************************************
+// JVM Startup Arguments
+//*************************************************************************
+
+    startScripts.defaultJvmOpts.add("-Xmx512m")
+    startScripts.defaultJvmOpts.add("-Xms256m")
+    startScripts.defaultJvmOpts.add("-XX:NewSize=192m")
+    startScripts.defaultJvmOpts.add("-XX:+UseParallelOldGC")
+    startScripts.defaultJvmOpts.add("-XX:+UseAdaptiveSizePolicy")
+    startScripts.defaultJvmOpts.add("-XX:MaxGCPauseMillis=1000")
+    startScripts.defaultJvmOpts.add("-Dfile.encoding=UTF-8")
+    startScripts.defaultJvmOpts.add("-Djava.security.egd=file:/dev/./urandom")
+}
+
+//*************************************************************************
+// Utilities
+//*************************************************************************
+
+task apiDocs(type:Javadoc) {
+    source subprojects.findAll{p -> (p.name == "module_api" || p.name == "module_shared")}.collect{p1 -> p1.sourceSets.main.allJava}
+    include '**/controller/**', '**/model/**', '**/ErrorCode.java'
+    classpath = files(subprojects.collect {project -> project.sourceSets.main.compileClasspath})
+    destinationDir = new File(projectDir, '/docs/api/')
+
+}
+
+//*************************************************************************
+// IDEA
+//*************************************************************************
+
+apply plugin: 'idea'
+
+idea {
+    module {
+        inheritOutputDirs = true
+        downloadSources = true
+    }
+}

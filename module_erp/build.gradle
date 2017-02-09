@@ -1,0 +1,22 @@
+project.set('deploy_target_svr_role', 'erp_svr')
+project.set('deploy_name', deploy_name_erp)
+project.set('executable', "carmore_erp_svr")
+project.set('http_port', http_port_erp)
+
+dependencies {
+    compile project(':module_shared')
+    compile "org.springframework.boot:spring-boot-starter-freemarker"
+    compile "org.apache.commons:commons-lang3:3.1"
+    compile "org.apache.poi:poi-ooxml:3.13"
+//    compile "net.sf.jxls:jxls-reader:1.0.6"
+}
+
+mainClassName = 'com.daqula.carmore.CarmoreErp'
+
+manifest {
+    attributes 'Main-Class': 'com.daqula.carmore.CarmoreErp'
+}
+
+startScripts.applicationName = "carmore_erp"
+
+startScripts.defaultJvmOpts.add("-Dserver.port=$http_port_erp")

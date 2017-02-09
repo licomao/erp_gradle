@@ -1,0 +1,1 @@
+ALTER TABLE `settle_order` ADD COLUMN `finish_date` datetime DEFAULT NULL;

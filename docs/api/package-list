@@ -1,0 +1,10 @@
+com.daqula.carmore
+com.daqula.carmore.controller
+com.daqula.carmore.model
+com.daqula.carmore.model.acl
+com.daqula.carmore.model.admin
+com.daqula.carmore.model.audit
+com.daqula.carmore.model.customer
+com.daqula.carmore.model.order
+com.daqula.carmore.model.shop
+com.daqula.carmore.model.template

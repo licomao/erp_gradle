@@ -1,0 +1,1 @@
+ALTER TABLE `base_set` ADD COLUMN `check_day` INT(11)  DEFAULT 1,ADD COLUMN `is_check_pd` bit(1) DEFAULT false;

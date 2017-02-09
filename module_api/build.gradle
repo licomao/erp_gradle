@@ -1,0 +1,27 @@
+project.set('deploy_target_svr_role', 'api_svr')
+project.set('deploy_name', deploy_name_api)
+project.set('executable', "carmore_api_svr")
+
+repositories {
+   flatDir {
+       dirs 'libs'
+   }
+}
+dependencies {
+    compile project(':module_shared')
+    compile 'org.springframework.boot:spring-boot-starter-thymeleaf'
+    compile files('libs/XingeApp.jar')
+
+    testCompile "junit:junit"
+    testCompile "org.springframework:spring-test"
+}
+
+mainClassName = 'com.daqula.carmore.CarmoreApi'
+
+manifest {
+    attributes 'Main-Class': 'com.daqula.carmore.CarmoreApi'
+}
+
+startScripts.applicationName = "carmore_api"
+
+startScripts.defaultJvmOpts.add("-Dserver.port=$http_port_api")
